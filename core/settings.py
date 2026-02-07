@@ -408,9 +408,9 @@ CACHE_TTL = {
     'DEFAULT': 7200,  # 2 hours
 }
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": "db_test.sqlite3",
-    }
-}
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.sqlite3",
+#         "NAME": "db_test.sqlite3",
+#     }
+# }
