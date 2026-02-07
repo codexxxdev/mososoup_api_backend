@@ -407,3 +407,10 @@ CACHE_TTL = {
     'EVENTS': 14400,  # 4 hours
     'DEFAULT': 7200,  # 2 hours
 }
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": "db_test.sqlite3",
+    }
+}

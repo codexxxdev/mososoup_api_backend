@@ -6,6 +6,7 @@ import random
 from decimal import Decimal
 from users.serializers import AdminUserUpdateSerializer
 from itertools import combinations
+from math import comb
 from decimal import Decimal
 from random import shuffle
 
@@ -144,7 +145,7 @@ class AdminNegativeUserSerializer:
     class Create(serializers.ModelSerializer):
         user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(),required=True)
         on_hold = serializers.PrimaryKeyRelatedField(queryset=OnHoldPay.objects.filter(is_active=True),required=True)
-        number_of_negative_product = serializers.IntegerField(required=True,min_value=0,max_value=3,help_text="Number of negative products must be between 0 and 3.")
+        number_of_negative_product = serializers.IntegerField(required=True,min_value=1,max_value=3,help_text="Number of negative products must be between 1 and 3.")
         rank_appearance = serializers.IntegerField(required=True,min_value=0)
         
         class Meta:
@@ -243,23 +244,52 @@ class AdminNegativeUserSerializer:
             Returns:
                 list: A list of selected product instances, or an empty list if no combination is found.
             """
-            # Fetch all products and shuffle them for randomness
-            products = list(Product.objects.filter(price__lte=max_amount))
-            shuffle(products)  # Randomize the order of products
+            # Fetch eligible products (deterministic order)
+            products = list(Product.objects.filter(price__lte=max_amount).only("id", "price"))
+            if not products or max_products <= 0 or len(products) < max_products:
+                return []
 
-            # Use a generator to lazily produce combinations
-            product_combinations = (combination for combination in combinations(products, max_products))
+            # For <= 3 products, use deterministic exact search (guaranteed when a combo exists)
+            if max_products == 1:
+                for p in products:
+                    price = Decimal(p.price)
+                    if min_amount <= price <= max_amount:
+                        return [p]
+                return []
 
-            # Iterate through combinations lazily
-            for combination in product_combinations:
-                # Calculate the total price for the combination
-                total_price = sum(Decimal(product.price) for product in combination)
+            # Sort once for efficient two-pointer searches
+            products_sorted = sorted(products, key=lambda p: Decimal(p.price))
+            prices = [Decimal(p.price) for p in products_sorted]
+            n = len(products_sorted)
 
-                # Check if total price falls within the specified range
-                if min_amount <= total_price <= max_amount:
-                    return list(combination)  # Return the first valid combination
+            if max_products == 2:
+                left, right = 0, n - 1
+                while left < right:
+                    total = prices[left] + prices[right]
+                    if total < min_amount:
+                        left += 1
+                    elif total > max_amount:
+                        right -= 1
+                    else:
+                        return [products_sorted[left], products_sorted[right]]
+                return []
 
-            # If no valid combination is found, return an empty list
+            if max_products == 3:
+                for i in range(n - 2):
+                    target_min = min_amount - prices[i]
+                    target_max = max_amount - prices[i]
+                    left, right = i + 1, n - 1
+                    while left < right:
+                        total = prices[left] + prices[right]
+                        if total < target_min:
+                            left += 1
+                        elif total > target_max:
+                            right -= 1
+                        else:
+                            return [products_sorted[i], products_sorted[left], products_sorted[right]]
+                return []
+
+            # If max_products is greater than 3, return empty to avoid timeouts
             return []
 
 
